@@ -9,7 +9,7 @@ spec:
   rules:
     - http:
         paths:
-          {% for i in range(1, 21) %}
+{% for i in range(1, 21) %}
           - path: /svc-{{ i }}
             pathType: Prefix
             backend:
@@ -17,4 +17,4 @@ spec:
                 name: nginx-svc-{{ i }}-svc
                 port:
                   number: 80
-          {% endfor %}
+{% endfor %}
