@@ -23,9 +23,9 @@
   when: k3d_cluster_check.rc != 0
 
 # worker-small: 1 GiB
-- name: Check if worker-small exists
+- name: Check if worker-small node container exists
   ansible.builtin.shell: |
-    k3d node list worker-small >/dev/null 2>&1
+    docker ps -a --format '{{.Names}}' | grep -q '^k3d-worker-small-0$'
   register: k3d_worker_small
   failed_when: false
   changed_when: false
@@ -38,10 +38,11 @@
       --memory 1g
   when: k3d_worker_small.rc != 0
 
+
 # worker-medium: 2 GiB
-- name: Check if worker-medium exists
+- name: Check if worker-medium node container exists
   ansible.builtin.shell: |
-    k3d node list worker-medium >/dev/null 2>&1
+    docker ps -a --format '{{.Names}}' | grep -q '^k3d-worker-medium-0$'
   register: k3d_worker_medium
   failed_when: false
   changed_when: false
@@ -54,10 +55,11 @@
       --memory 2g
   when: k3d_worker_medium.rc != 0
 
+
 # worker-large: 2 GiB
-- name: Check if worker-large exists
+- name: Check if worker-large node container exists
   ansible.builtin.shell: |
-    k3d node list worker-large >/dev/null 2>&1
+    docker ps -a --format '{{.Names}}' | grep -q '^k3d-worker-large-0$'
   register: k3d_worker_large
   failed_when: false
   changed_when: false
@@ -70,10 +72,11 @@
       --memory 2g
   when: k3d_worker_large.rc != 0
 
+
 # worker-xlarge: 2 GiB
-- name: Check if worker-xlarge exists
+- name: Check if worker-xlarge node container exists
   ansible.builtin.shell: |
-    k3d node list worker-xlarge >/dev/null 2>&1
+    docker ps -a --format '{{.Names}}' | grep -q '^k3d-worker-xlarge-0$'
   register: k3d_worker_xlarge
   failed_when: false
   changed_when: false
@@ -85,6 +88,7 @@
       --role agent \
       --memory 2g
   when: k3d_worker_xlarge.rc != 0
+
 
 - name: Merge kubeconfig and switch context to myk3s
   ansible.builtin.shell: |
