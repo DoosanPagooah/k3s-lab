@@ -21,7 +21,7 @@
       --api-port 6443 \
       --port 8080:80@loadbalancer
   when: k3d_cluster_check.rc != 0
-  
+
 # worker-small: 1 GiB
 - name: Check if worker-small node container exists
   ansible.builtin.shell: |
@@ -90,18 +90,17 @@
   when: k3d_worker_xlarge.rc != 0
 
 
-
-
-- name: Merge kubeconfig and switch context to myk3s
+- name: Merge kubeconfig and switch context to myk3s (as ubuntu user)
+  become: false
   ansible.builtin.shell: |
     k3d kubeconfig merge myk3s --kubeconfig-merge-default --kubeconfig-switch-context
   changed_when: false
 
 
+
 - name: Wait for all 5 nodes to appear
   kubernetes.core.k8s_info:
     kind: Node
-    kubeconfig: "{{ lookup('env', 'HOME') + '/.kube/config' }}"
   register: node_info
   retries: 30
   delay: 10
