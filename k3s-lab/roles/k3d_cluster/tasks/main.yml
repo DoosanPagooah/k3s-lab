@@ -91,7 +91,6 @@
 
 
 - name: Merge kubeconfig and switch context to myk3s (as root)
-  # play already has become: true, so we do not override it here
   ansible.builtin.shell: |
     k3d kubeconfig merge myk3s --kubeconfig-merge-default --kubeconfig-switch-context
   changed_when: false
@@ -105,13 +104,13 @@
     group: ubuntu
 
 - name: Copy kubeconfig to ubuntu home
-  copy:
+  ansible.builtin.copy:
     src: /root/.kube/config
     dest: /home/ubuntu/.kube/config
     owner: ubuntu
     group: ubuntu
     mode: "0600"
-  remote_src: true
+    remote_src: true
 
 - name: Wait for all 5 nodes to appear
   kubernetes.core.k8s_info:
@@ -121,4 +120,5 @@
   retries: 30
   delay: 10
   until: node_info.resources is defined and (node_info.resources | length) >= 5
+
 
