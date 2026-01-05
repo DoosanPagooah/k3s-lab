@@ -18,20 +18,20 @@ spec:
         svc-id: "{{ index }}"
     spec:
       containers:
-        - name: nginx
-          image: nginx:stable
+        - name: http-echo
+          image: hashicorp/http-echo:0.2.3
+          args:
+            - "-text=Hello from svc-{{ index }}"
           ports:
-            - containerPort: 80
-          env:
-            - name: SERVICE_NAME
-              value: "nginx-svc-{{ index }}"
+            - containerPort: 5678
           resources:
             requests:
-              cpu: "100m"
-              memory: "64Mi"
+              cpu: "50m"
+              memory: "32Mi"
             limits:
-              cpu: "300m"
-              memory: "128Mi"
+              cpu: "200m"
+              memory: "64Mi"
+          
 ---
 apiVersion: v1
 kind: Service
@@ -46,5 +46,5 @@ spec:
     app: nginx-svc-{{ index }}
   ports:
     - port: 80
-      targetPort: 80
+      targetPort: 5678
   type: ClusterIP
