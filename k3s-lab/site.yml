@@ -5,5 +5,5 @@
     - common
     - k3d_cluster
     - nginx_services
-    - argocd
-    - monitoring
+    #- argocd
+    #- monitoring
