@@ -94,6 +94,10 @@ main() {
   install_ansible_and_deps
   install_collections
   check_ansible_files
+
+  # Make sure sudo is authenticated before Ansible uses become
+  ensure_sudo
+
   run_playbook
 
   log_info "All done. You can now use kubectl to inspect the cluster."
@@ -101,5 +105,6 @@ main() {
   echo "  kubectl get nodes -o wide"
   echo "  kubectl get pods -A"
 }
+
 
 main "$@"
