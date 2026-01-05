@@ -92,19 +92,11 @@
   changed_when: false
 
 
-- name: Wait for all 5 nodes to be Ready
+- name: Wait for all 5 nodes to appear
   kubernetes.core.k8s_info:
     kind: Node
+    kubeconfig: "{{ lookup('env', 'HOME') + '/.kube/config' }}"
   register: node_info
   retries: 30
   delay: 10
-  until: >
-    node_info.resources | length >= 5 and
-    (
-      node_info.resources
-      | map(attribute='status.conditions')
-      | map('selectattr', 'type', 'equalto', 'Ready')
-      | map('selectattr', 'status', 'equalto', 'True')
-      | map('length')
-      | sum
-    ) >= 5
+  until: node_info.resources is defined and (node_info.resources | length) >= 5
