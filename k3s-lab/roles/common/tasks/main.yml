@@ -9,30 +9,11 @@
     update_cache: true
     state: present
 
-- name: Add Docker GPG key
+- name: Install Docker using official convenience script
   ansible.builtin.shell: |
-    install -m 0755 -d /etc/apt/keyrings
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-      | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+    curl -fsSL https://get.docker.com | sh
   args:
-    creates: /etc/apt/keyrings/docker.gpg
-
-- name: Add Docker repo
-  copy:
-    dest: /etc/apt/sources.list.d/docker.list
-    content: |
-      deb [arch={{ ansible_architecture }} signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable
-
-- name: Install Docker engine
-  apt:
-    name:
-      - docker-ce
-      - docker-ce-cli
-      - containerd.io
-      - docker-buildx-plugin
-      - docker-compose-plugin
-    update_cache: true
-    state: present
+    creates: /usr/bin/docker
 
 - name: Ensure docker group membership
   user:
