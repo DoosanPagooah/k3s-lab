@@ -88,8 +88,9 @@
 
 - name: Merge kubeconfig and switch context to myk3s
   ansible.builtin.shell: |
-    k3d kubeconfig merge myk3s --switch-context
+    k3d kubeconfig merge myk3s --kubeconfig-merge-default --kubeconfig-switch-context
   changed_when: false
+
 
 - name: Wait for all 5 nodes to be Ready
   kubernetes.core.k8s_info:
