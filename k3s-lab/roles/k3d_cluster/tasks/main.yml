@@ -89,14 +89,14 @@
       --memory 2g
   when: k3d_worker_xlarge.rc != 0
 
-
-- name: Merge kubeconfig and switch context to myk3s (as root)
+- name: Generate kubeconfig for myk3s under /root/.kube/config
   ansible.builtin.shell: |
-    k3d kubeconfig merge myk3s --kubeconfig-merge-default --kubeconfig-switch-context
+    mkdir -p /root/.kube
+    k3d kubeconfig get myk3s > /root/.kube/config
   changed_when: false
 
 - name: Ensure ubuntu kubeconfig directory exists
-  file:
+  ansible.builtin.file:
     path: /home/ubuntu/.kube
     state: directory
     mode: "0755"
@@ -112,13 +112,14 @@
     mode: "0600"
     remote_src: true
 
-- name: Wait for all 5 nodes to appear
-  kubernetes.core.k8s_info:
-    kind: Node
-    kubeconfig: /root/.kube/config
-  register: node_info
+- name: Wait for all 5 nodes to appear (using kubectl)
+  ansible.builtin.shell: |
+    KUBECONFIG=/root/.kube/config kubectl get nodes --no-headers 2>/dev/null | wc -l
+  register: node_count
   retries: 30
   delay: 10
-  until: node_info.resources is defined and (node_info.resources | length) >= 5
+  until: (node_count.stdout | int) >= 5
+  changed_when: false
+
 
 
