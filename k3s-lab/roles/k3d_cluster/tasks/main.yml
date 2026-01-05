@@ -21,24 +21,7 @@
       --api-port 6443 \
       --port 8080:80@loadbalancer
   when: k3d_cluster_check.rc != 0
-
-# worker-small: 1 GiB
-- name: Check if worker-small node container exists
-  ansible.builtin.shell: |
-    docker ps -a --format '{{.Names}}' | grep -q '^k3d-worker-small-0$'
-  register: k3d_worker_small
-  failed_when: false
-  changed_when: false
-
-- name: Create worker-small (1 GiB)
-  ansible.builtin.shell: |
-    k3d node create worker-small \
-      --cluster myk3s \
-      --role agent \
-      --memory 1g
-  when: k3d_worker_small.rc != 0
-
-
+  
 # worker-small: 1 GiB
 - name: Check if worker-small node container exists
   ansible.builtin.shell: |
@@ -105,6 +88,7 @@
       --role agent \
       --memory 2g
   when: k3d_worker_xlarge.rc != 0
+
 
 
 
