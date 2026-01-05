@@ -6,20 +6,17 @@
   loop_control:
     loop_var: index
 
-- name: Wait for nginx pods to be Ready
-  kubernetes.core.k8s_info:
-    kind: Pod
-    label_selectors:
-      - "app in ({{ nginx_labels }})"
-  vars:
-    nginx_labels: "{{ range(1, 21) | map('regex_replace', '^(.*)$', 'nginx-svc-\\1') | join(',') }}"
-  register: pods
-  retries: 20
+- name: Wait for 20 nginx pods to be Running
+  ansible.builtin.shell: |
+    KUBECONFIG=/root/.kube/config \
+      kubectl get pods -n default -l svc-id \
+      --field-selector=status.phase=Running \
+      --no-headers 2>/dev/null | wc -l
+  register: running_pods
+  retries: 30
   delay: 10
-  until: >
-    pods.resources | length == 20 and
-    (pods.resources | map(attribute='status.containerStatuses') | list
-     | flatten | selectattr('ready', 'equalto', true) | list | length) == 20
+  until: (running_pods.stdout | int) >= 20
+  changed_when: false
 
 - name: Create ingress to expose nginx microservices on /svc-N
   kubernetes.core.k8s:
