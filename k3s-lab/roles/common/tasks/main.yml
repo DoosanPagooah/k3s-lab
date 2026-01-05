@@ -9,6 +9,12 @@
     update_cache: true
     state: present
 
+- name: Install Python Kubernetes client
+  apt:
+    name: python3-kubernetes
+    state: present
+
+
 - name: Install Docker using official convenience script
   ansible.builtin.shell: |
     curl -fsSL https://get.docker.com | sh
