@@ -1,0 +1,48 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-svc-{{ index }}
+  labels:
+    app: nginx-svc-{{ index }}
+    svc-id: "{{ index }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-svc-{{ index }}
+  template:
+    metadata:
+      labels:
+        app: nginx-svc-{{ index }}
+        svc-id: "{{ index }}"
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:stable
+          ports:
+            - containerPort: 80
+          env:
+            - name: SERVICE_NAME
+              value: "nginx-svc-{{ index }}"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "64Mi"
+            limits:
+              cpu: "300m"
+              memory: "128Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc-{{ index }}-svc
+  labels:
+    app: nginx-svc-{{ index }}
+    svc-id: "{{ index }}"
+spec:
+  selector:
+    app: nginx-svc-{{ index }}
+  ports:
+    - port: 80
+      targetPort: 80
+  type: ClusterIP

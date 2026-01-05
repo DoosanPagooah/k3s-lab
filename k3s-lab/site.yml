@@ -1,0 +1,9 @@
+- hosts: cluster_host
+  become: true
+
+  roles:
+    - common
+    - k3d_cluster
+    - nginx_services
+    - argocd
+    - monitoring

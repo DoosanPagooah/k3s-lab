@@ -1,0 +1,109 @@
+---
+- name: Install k3d if not present
+  ansible.builtin.shell: |
+    curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+  args:
+    creates: /usr/local/bin/k3d
+
+- name: Check if k3d cluster myk3s already exists
+  ansible.builtin.shell: |
+    k3d cluster list myk3s >/dev/null 2>&1
+  register: k3d_cluster_check
+  failed_when: false
+  changed_when: false
+
+- name: Create k3d cluster myk3s (1 server, no agents yet)
+  ansible.builtin.shell: |
+    k3d cluster create myk3s \
+      --servers 1 \
+      --agents 0 \
+      --servers-memory 3g \
+      --api-port 6443 \
+      --port 8080:80@loadbalancer
+  when: k3d_cluster_check.rc != 0
+
+# worker-small: 1 GiB
+- name: Check if worker-small exists
+  ansible.builtin.shell: |
+    k3d node list worker-small >/dev/null 2>&1
+  register: k3d_worker_small
+  failed_when: false
+  changed_when: false
+
+- name: Create worker-small (1 GiB)
+  ansible.builtin.shell: |
+    k3d node create worker-small \
+      --cluster myk3s \
+      --role agent \
+      --memory 1g
+  when: k3d_worker_small.rc != 0
+
+# worker-medium: 2 GiB
+- name: Check if worker-medium exists
+  ansible.builtin.shell: |
+    k3d node list worker-medium >/dev/null 2>&1
+  register: k3d_worker_medium
+  failed_when: false
+  changed_when: false
+
+- name: Create worker-medium (2 GiB)
+  ansible.builtin.shell: |
+    k3d node create worker-medium \
+      --cluster myk3s \
+      --role agent \
+      --memory 2g
+  when: k3d_worker_medium.rc != 0
+
+# worker-large: 2 GiB
+- name: Check if worker-large exists
+  ansible.builtin.shell: |
+    k3d node list worker-large >/dev/null 2>&1
+  register: k3d_worker_large
+  failed_when: false
+  changed_when: false
+
+- name: Create worker-large (2 GiB)
+  ansible.builtin.shell: |
+    k3d node create worker-large \
+      --cluster myk3s \
+      --role agent \
+      --memory 2g
+  when: k3d_worker_large.rc != 0
+
+# worker-xlarge: 2 GiB
+- name: Check if worker-xlarge exists
+  ansible.builtin.shell: |
+    k3d node list worker-xlarge >/dev/null 2>&1
+  register: k3d_worker_xlarge
+  failed_when: false
+  changed_when: false
+
+- name: Create worker-xlarge (2 GiB)
+  ansible.builtin.shell: |
+    k3d node create worker-xlarge \
+      --cluster myk3s \
+      --role agent \
+      --memory 2g
+  when: k3d_worker_xlarge.rc != 0
+
+- name: Merge kubeconfig and switch context to myk3s
+  ansible.builtin.shell: |
+    k3d kubeconfig merge myk3s --switch-context
+  changed_when: false
+
+- name: Wait for all 5 nodes to be Ready
+  kubernetes.core.k8s_info:
+    kind: Node
+  register: node_info
+  retries: 30
+  delay: 10
+  until: >
+    node_info.resources | length >= 5 and
+    (
+      node_info.resources
+      | map(attribute='status.conditions')
+      | map('selectattr', 'type', 'equalto', 'Ready')
+      | map('selectattr', 'status', 'equalto', 'True')
+      | map('length')
+      | sum
+    ) >= 5
