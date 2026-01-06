@@ -51,11 +51,12 @@ def run_ansible_lab():
 
 
 
-
 def get_pods(namespace="default"):
     cmd = ["kubectl", "get", "pods", "-n", namespace, "-o", "json"]
-    out = run_cmd(cmd)
-    if not out:
+    out, err, rc = run_cmd(cmd)
+    if rc != 0 or not out:
+        if err:
+            st.error(f"Failed to get pods: {err}")
         return pd.DataFrame()
 
     data = json.loads(out)
@@ -78,6 +79,8 @@ def get_pods(namespace="default"):
     if not df.empty:
         df = df.sort_values(["microservice", "pod"])
     return df
+
+
 
 
 def parse_resource_value(v):
@@ -121,8 +124,10 @@ def parse_resource_value(v):
 def get_node_info():
     # Basic node info
     cmd = ["kubectl", "get", "nodes", "-o", "json"]
-    out = run_cmd(cmd)
-    if not out:
+    out, err, rc = run_cmd(cmd)
+    if rc != 0 or not out:
+        if err:
+            st.error(f"Failed to get nodes: {err}")
         return pd.DataFrame(), pd.DataFrame()
 
     data = json.loads(out)
@@ -144,15 +149,14 @@ def get_node_info():
 
     base_df = pd.DataFrame(rows)
 
-    # Metrics from kubectl top nodes (if metrics server is available)
+    # Metrics from kubectl top nodes
     cmd = ["kubectl", "top", "nodes", "--no-headers"]
-    top_out = run_cmd(cmd)
+    top_out, top_err, top_rc = run_cmd(cmd)
     metric_rows = []
-    if top_out:
+    if top_rc == 0 and top_out:
         for line in top_out.splitlines():
             parts = line.split()
             if len(parts) >= 5:
-                # NAME CPU(cores) CPU% MEMORY(bytes) MEMORY%
                 node_name = parts[0]
                 cpu_cores = parts[1]
                 cpu_pct = parts[2]
