@@ -1,9 +1,10 @@
+import itertools
 import subprocess
 import json
 import time
-
 import pandas as pd
 import streamlit as st
+
 
 
 def run_cmd(cmd, cwd=None):
@@ -22,6 +23,52 @@ def run_cmd(cmd, cwd=None):
     except Exception as e:
         st.error(f"Command failed: {' '.join(cmd)}\n{e}")
         return "", str(e), 1
+
+
+def stream_cmd_ui(cmd, cwd=None, placeholder=None, title="Action output"):
+    """
+    Run a command and stream its combined stdout+stderr
+    into a Streamlit placeholder as it runs.
+    Returns the exit code.
+    """
+    if placeholder is None:
+        placeholder = st.empty()
+
+    lines = []
+
+    with placeholder.container():
+        st.markdown(f"### {title}")
+        log_box = st.empty()
+
+        try:
+            process = subprocess.Popen(
+                cmd,
+                cwd=cwd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            )
+
+            for line in process.stdout:
+                line = line.rstrip("\n")
+                lines.append(line)
+                # show last 200 lines to avoid huge blocks
+                log_box.code("\n".join(lines[-200:]), language="bash")
+
+            process.wait()
+            rc = process.returncode
+            lines.append(f"\n[exit code {rc}]")
+            log_box.code("\n".join(lines[-200:]), language="bash")
+            return rc
+
+        except Exception as e:
+            lines.append(f"Error: {e}")
+            log_box.code("\n".join(lines), language="bash")
+            return 1
+
+
+
 
 
 K3D_CLUSTER_NAME = "myk3s"
@@ -180,8 +227,15 @@ def get_node_info():
 
     return merged, metrics_df
 
-
 def main():
+    st.set_page_config(page_title="K3s Microservices Dashboard", layout="wide")
+    st.title("K3s Microservices and Nodes Dashboard")
+    st.caption("Cluster: myk3s (k3d)")
+
+    # shared area in the main page where button actions will print logs
+    action_log = st.empty()
+
+    # sidebar controls
     st.sidebar.header("Controls")
     interval = st.sidebar.slider("Auto refresh interval (seconds)", 5, 60, 10)
     st.sidebar.write("Last refresh:", time.strftime("%H:%M:%S"))
@@ -189,40 +243,41 @@ def main():
     st.sidebar.markdown("### Cluster actions")
 
     if st.sidebar.button("Start cluster"):
-        out, err, rc = k3d_cluster_start()
+        rc = stream_cmd_ui(
+            ["k3d", "cluster", "start", K3D_CLUSTER_NAME],
+            placeholder=action_log,
+            title="Start cluster output",
+        )
         st.sidebar.write(f"Start cluster exit code: {rc}")
-        if out:
-            st.sidebar.code(out, language="bash")
-        if err:
-            st.sidebar.code(err, language="bash")
 
     if st.sidebar.button("Stop cluster"):
-        out, err, rc = k3d_cluster_stop()
+        rc = stream_cmd_ui(
+            ["k3d", "cluster", "stop", K3D_CLUSTER_NAME],
+            placeholder=action_log,
+            title="Stop cluster output",
+        )
         st.sidebar.write(f"Stop cluster exit code: {rc}")
-        if out:
-            st.sidebar.code(out, language="bash")
-        if err:
-            st.sidebar.code(err, language="bash")
 
     if st.sidebar.button("Restart microservices"):
-        out, err, rc = restart_microservices()
+        rc = stream_cmd_ui(
+            ["kubectl", "rollout", "restart",
+             "deployment", "-n", "default", "-l", "svc-id"],
+            placeholder=action_log,
+            title="Restart microservices output",
+        )
         st.sidebar.write(f"Restart microservices exit code: {rc}")
-        if out:
-            st.sidebar.code(out, language="bash")
-        if err:
-            st.sidebar.code(err, language="bash")
 
     st.sidebar.markdown("### Lab bootstrap")
 
     if st.sidebar.button("Run bash run.sh"):
         st.sidebar.write("Running bash run.sh, this may take a while...")
-        out, err, rc = run_ansible_lab()
+        rc = stream_cmd_ui(
+            ["bash", "run.sh"],
+            cwd=LAB_DIR,
+            placeholder=action_log,
+            title="run.sh output",
+        )
         st.sidebar.write(f"run.sh exit code: {rc}")
-        if out:
-            st.sidebar.code(out, language="bash")
-        if err:
-            st.sidebar.code(err, language="bash")
-
 
     # Load data
     pods_df = get_pods("default")
@@ -245,7 +300,6 @@ def main():
 
     if not nodes_df.empty:
         display_df = nodes_df.copy()
-        # add human readable memory fields
         display_df["mem_capacity_GiB"] = (display_df["mem_capacity_bytes"] / (1024**3)).round(2)
         if "mem_used_bytes" in display_df.columns:
             display_df["mem_used_GiB"] = (display_df["mem_used_bytes"] / (1024**3)).round(2)
@@ -255,7 +309,6 @@ def main():
 
     st.markdown("### Microservices by node")
 
-    # Group microservices per node
     ms_node_df = pods_df.groupby(["node", "microservice"]).size().reset_index(name="pods")
     pivot = ms_node_df.pivot(index="node", columns="microservice", values="pods").fillna(0).astype(int)
     st.dataframe(pivot)
@@ -272,8 +325,9 @@ def main():
 
     st.sidebar.info("Tip: run `streamlit run dashboard.py` and open the URL from your host browser.")
 
-    # Trigger periodic refresh
-    st.rerun()
+    # For now, do not hard loop with st.rerun()
+    # If you want auto refresh, we can switch to st.autorefresh later.
+
 
 
 if __name__ == "__main__":
