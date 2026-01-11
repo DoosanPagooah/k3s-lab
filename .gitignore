@@ -1,0 +1,42 @@
+# ===== OS / Editor noise =====
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# ===== Python =====
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+venv/
+.env
+
+# ===== Ansible =====
+*.retry
+ansible.log
+*.log
+.hosts
+*.vault
+
+# ===== k3s / k3d / Kubernetes =====
+kubeconfig
+kubeconfig.yaml
+kubeconfig.yml
+*.kubeconfig
+k3s.yaml
+
+# ===== Terraform (if added later) =====
+.terraform/
+*.tfstate
+*.tfstate.backup
+
+# ===== Secrets =====
+*.key
+*.pem
+*.crt
+*.secret
+secrets.yml
