@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-svc-{{ index }}
+  namespace: default
+  labels:
+    app: nginx-svc-{{ index }}
+    svc-id: "{{ index }}"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-svc-{{ index }}
+  template:
+    metadata:
+      labels:
+        app: nginx-svc-{{ index }}
+        svc-id: "{{ index }}"
+    spec:
+      containers:
+        - name: http-echo
+          image: hashicorp/http-echo:0.2.3
+          args:
+            - "-text=Hello from svc-{{ index }}"
+          ports:
+            - containerPort: 5678
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "32Mi"
+            limits:
+              cpu: "200m"
+              memory: "64Mi"
+          
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-svc-{{ index }}-svc
+  namespace: default
+  labels:
+    app: nginx-svc-{{ index }}
+    svc-id: "{{ index }}"
+spec:
+  selector:
+    app: nginx-svc-{{ index }}
+  ports:
+    - port: 80
+      targetPort: 5678
+  type: ClusterIP

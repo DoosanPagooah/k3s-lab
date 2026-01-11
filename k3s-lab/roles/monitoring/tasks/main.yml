@@ -1,0 +1,28 @@
+# monitoring role tasks
+- name: Add prometheus-community repo
+  ansible.builtin.shell: |
+    helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+    helm repo update
+  args:
+    creates: /root/.cache/helm
+
+- name: Install kube-prometheus-stack
+  ansible.builtin.shell: |
+    helm upgrade --install kps prometheus-community/kube-prometheus-stack \
+      --namespace monitoring \
+      --create-namespace
+  args:
+    chdir: /root
+  register: helm_result
+  changed_when: "'deployed' in helm_result.stdout or 'upgraded' in helm_result.stdout or helm_result.rc == 0"
+
+- name: Wait for Prometheus pods
+  kubernetes.core.k8s_info:
+    kind: Pod
+    namespace: monitoring
+    label_selectors:
+      - app.kubernetes.io/name=kps-kube-prometheus-stack-prometheus
+  register: prom_pods
+  retries: 30
+  delay: 10
+  until: prom_pods.resources | length > 0
