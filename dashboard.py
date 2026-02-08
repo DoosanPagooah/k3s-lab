@@ -284,7 +284,7 @@ def main():
         st.session_state["last_log"] = {"title": "Stop cluster output", "content": out}
         st.rerun()
 
-    if st.sidebar.button("Restart microservices"):
+    if st.sidebar.button("Restart microservices", disabled=not cluster_running):
         rc, _ = stream_cmd_ui(
             ["kubectl", "rollout", "restart",
              "deployment", "-n", "default", "-l", "svc-id"],
