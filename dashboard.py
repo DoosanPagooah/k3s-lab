@@ -75,6 +75,22 @@ K3D_CLUSTER_NAME = "myk3s"
 LAB_DIR = "/home/ubuntu/k3s-lab/k3s-lab"  # adjust if your repo lives elsewhere
 
 
+def is_cluster_running():
+    cmd = ["k3d", "cluster", "list", K3D_CLUSTER_NAME, "--no-headers"]
+    out, _, rc = run_cmd(cmd)
+    if rc != 0 or not out:
+        return False
+    try:
+        parts = out.split()
+        if len(parts) >= 2:
+            servers = parts[1]
+            running = int(servers.split("/")[0])
+            return running > 0
+    except Exception:
+        pass
+    return False
+
+
 def k3d_cluster_start():
     return run_cmd(["k3d", "cluster", "start", K3D_CLUSTER_NAME])
 
@@ -242,7 +258,9 @@ def main():
 
     st.sidebar.markdown("### Cluster actions")
 
-    if st.sidebar.button("Start cluster"):
+    cluster_running = is_cluster_running()
+
+    if st.sidebar.button("Start cluster", disabled=cluster_running):
         rc = stream_cmd_ui(
             ["k3d", "cluster", "start", K3D_CLUSTER_NAME],
             placeholder=action_log,
@@ -250,7 +268,7 @@ def main():
         )
         st.sidebar.write(f"Start cluster exit code: {rc}")
 
-    if st.sidebar.button("Stop cluster"):
+    if st.sidebar.button("Stop cluster", disabled=not cluster_running):
         rc = stream_cmd_ui(
             ["k3d", "cluster", "stop", K3D_CLUSTER_NAME],
             placeholder=action_log,
@@ -332,4 +350,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
