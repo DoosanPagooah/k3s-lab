@@ -130,6 +130,10 @@ def get_pods(namespace="default"):
         status = item.get("status", {})
         labels = meta.get("labels", {})
 
+        # Skip terminating pods to avoid double counting during rollouts
+        if meta.get("deletionTimestamp"):
+            continue
+
         rows.append({
             "microservice": labels.get("app", ""),
             "svc_id": labels.get("svc-id", ""),
