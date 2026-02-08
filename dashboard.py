@@ -60,12 +60,12 @@ def stream_cmd_ui(cmd, cwd=None, placeholder=None, title="Action output"):
             rc = process.returncode
             lines.append(f"\n[exit code {rc}]")
             log_box.code("\n".join(lines[-200:]), language="bash")
-            return rc
+            return rc, "\n".join(lines)
 
         except Exception as e:
             lines.append(f"Error: {e}")
             log_box.code("\n".join(lines), language="bash")
-            return 1
+            return 1, "\n".join(lines)
 
 
 
@@ -251,6 +251,11 @@ def main():
     # shared area in the main page where button actions will print logs
     action_log = st.empty()
 
+    if "last_log" in st.session_state:
+        with action_log.container():
+            st.markdown(f"### {st.session_state['last_log']['title']}")
+            st.code(st.session_state['last_log']['content'], language="bash")
+
     # sidebar controls
     st.sidebar.header("Controls")
     st.sidebar.button("Manual Refresh")
@@ -262,23 +267,25 @@ def main():
     cluster_running = is_cluster_running()
 
     if st.sidebar.button("Start cluster", disabled=cluster_running):
-        rc = stream_cmd_ui(
+        rc, out = stream_cmd_ui(
             ["k3d", "cluster", "start", K3D_CLUSTER_NAME],
             placeholder=action_log,
             title="Start cluster output",
         )
-        st.sidebar.write(f"Start cluster exit code: {rc}")
+        st.session_state["last_log"] = {"title": "Start cluster output", "content": out}
+        st.rerun()
 
     if st.sidebar.button("Stop cluster", disabled=not cluster_running):
-        rc = stream_cmd_ui(
+        rc, out = stream_cmd_ui(
             ["k3d", "cluster", "stop", K3D_CLUSTER_NAME],
             placeholder=action_log,
             title="Stop cluster output",
         )
-        st.sidebar.write(f"Stop cluster exit code: {rc}")
+        st.session_state["last_log"] = {"title": "Stop cluster output", "content": out}
+        st.rerun()
 
     if st.sidebar.button("Restart microservices"):
-        rc = stream_cmd_ui(
+        rc, _ = stream_cmd_ui(
             ["kubectl", "rollout", "restart",
              "deployment", "-n", "default", "-l", "svc-id"],
             placeholder=action_log,
@@ -290,7 +297,7 @@ def main():
 
     if st.sidebar.button("Run bash run.sh"):
         st.sidebar.write("Running bash run.sh, this may take a while...")
-        rc = stream_cmd_ui(
+        rc, _ = stream_cmd_ui(
             ["bash", "run.sh"],
             cwd=LAB_DIR,
             placeholder=action_log,
