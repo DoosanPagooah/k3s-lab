@@ -253,6 +253,7 @@ def main():
 
     # sidebar controls
     st.sidebar.header("Controls")
+    st.sidebar.button("Manual Refresh")
     interval = st.sidebar.slider("Auto refresh interval (seconds)", 5, 60, 10)
     st.sidebar.write("Last refresh:", time.strftime("%H:%M:%S"))
 
