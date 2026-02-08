@@ -4,6 +4,7 @@ import json
 import time
 import pandas as pd
 import streamlit as st
+import streamlit_shadcn_ui as ui
 
 
 
@@ -336,38 +337,41 @@ def main():
     # Summary
     col1, col2, col3 = st.columns(3)
     with col1:
-        st.metric("Microservices", pods_df["microservice"].nunique())
+        ui.metric_card(title="Microservices", content=int(pods_df["microservice"].nunique()), key="mc1")
     with col2:
-        st.metric("Pods (default ns)", len(pods_df))
+        ui.metric_card(title="Pods (default ns)", content=len(pods_df), key="mc2")
     with col3:
-        st.metric("Nodes", nodes_df["node"].nunique() if not nodes_df.empty else 0)
+        ui.metric_card(title="Nodes", content=int(nodes_df["node"].nunique() if not nodes_df.empty else 0), key="mc3")
 
-    st.markdown("### Node overview")
+    st.divider()
+    
+    view_tab = ui.tabs(options=['Node Overview', 'Microservices Matrix', 'Pod Details', 'Pods per Node'], default_value='Node Overview', key="main_tabs")
 
-    if not nodes_df.empty:
-        display_df = nodes_df.copy()
-        display_df["mem_capacity_GiB"] = (display_df["mem_capacity_bytes"] / (1024**3)).round(2)
-        if "mem_used_bytes" in display_df.columns:
-            display_df["mem_used_GiB"] = (display_df["mem_used_bytes"] / (1024**3)).round(2)
-        st.dataframe(display_df.set_index("node"))
-    else:
-        st.warning("Could not load node info. Check kubectl access.")
+    if view_tab == 'Node Overview':
+        st.markdown("### Node overview")
+        if not nodes_df.empty:
+            display_df = nodes_df.copy()
+            display_df["mem_capacity_GiB"] = (display_df["mem_capacity_bytes"] / (1024**3)).round(2)
+            if "mem_used_bytes" in display_df.columns:
+                display_df["mem_used_GiB"] = (display_df["mem_used_bytes"] / (1024**3)).round(2)
+            st.dataframe(display_df.set_index("node"), use_container_width=True)
+        else:
+            st.warning("Could not load node info. Check kubectl access.")
 
-    st.markdown("### Microservices by node")
+    elif view_tab == 'Microservices Matrix':
+        st.markdown("### Microservices by node")
+        ms_node_df = pods_df.groupby(["node", "microservice"]).size().reset_index(name="pods")
+        pivot = ms_node_df.pivot(index="node", columns="microservice", values="pods").fillna(0).astype(int)
+        st.dataframe(pivot, use_container_width=True)
 
-    ms_node_df = pods_df.groupby(["node", "microservice"]).size().reset_index(name="pods")
-    pivot = ms_node_df.pivot(index="node", columns="microservice", values="pods").fillna(0).astype(int)
-    st.dataframe(pivot)
+    elif view_tab == 'Pod Details':
+        st.markdown("### Microservice instances")
+        st.dataframe(pods_df, use_container_width=True)
 
-    st.markdown("### Microservice instances")
-
-    with st.expander("Pod level view"):
-        st.dataframe(pods_df)
-
-    st.markdown("### Pods per node")
-
-    pods_per_node = pods_df.groupby("node").size().reset_index(name="pod_count")
-    st.bar_chart(data=pods_per_node, x="node", y="pod_count")
+    elif view_tab == 'Pods per Node':
+        st.markdown("### Pods per node")
+        pods_per_node = pods_df.groupby("node").size().reset_index(name="pod_count")
+        st.bar_chart(data=pods_per_node, x="node", y="pod_count")
 
     st.sidebar.info("Tip: run `streamlit run dashboard.py` and open the URL from your host browser.")
 
