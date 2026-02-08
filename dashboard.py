@@ -54,17 +54,17 @@ def stream_cmd_ui(cmd, cwd=None, placeholder=None, title="Action output"):
                 line = line.rstrip("\n")
                 lines.append(line)
                 # show last 200 lines to avoid huge blocks
-                log_box.code("\n".join(lines[-200:]), language="bash")
+                log_box.text_area("Log Output", value="\n".join(lines[-200:]), height=300)
 
             process.wait()
             rc = process.returncode
             lines.append(f"\n[exit code {rc}]")
-            log_box.code("\n".join(lines[-200:]), language="bash")
+            log_box.text_area("Log Output", value="\n".join(lines[-200:]), height=300)
             return rc, "\n".join(lines)
 
         except Exception as e:
             lines.append(f"Error: {e}")
-            log_box.code("\n".join(lines), language="bash")
+            log_box.text_area("Log Output", value="\n".join(lines), height=300)
             return 1, "\n".join(lines)
 
 
@@ -258,7 +258,7 @@ def main():
     if "last_log" in st.session_state:
         with action_log.container():
             st.markdown(f"### {st.session_state['last_log']['title']}")
-            st.code(st.session_state['last_log']['content'], language="bash")
+            st.text_area("Log Output", value=st.session_state['last_log']['content'], height=300)
 
     # sidebar controls
     st.sidebar.header("Controls")
