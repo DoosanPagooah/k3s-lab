@@ -354,7 +354,7 @@ def main():
             display_df["mem_capacity_GiB"] = (display_df["mem_capacity_bytes"] / (1024**3)).round(2)
             if "mem_used_bytes" in display_df.columns:
                 display_df["mem_used_GiB"] = (display_df["mem_used_bytes"] / (1024**3)).round(2)
-            st.dataframe(display_df.set_index("node"), use_container_width=True)
+            st.dataframe(display_df.set_index("node"), width="stretch")
         else:
             st.warning("Could not load node info. Check kubectl access.")
 
@@ -362,11 +362,11 @@ def main():
         st.markdown("### Microservices by node")
         ms_node_df = pods_df.groupby(["node", "microservice"]).size().reset_index(name="pods")
         pivot = ms_node_df.pivot(index="node", columns="microservice", values="pods").fillna(0).astype(int)
-        st.dataframe(pivot, use_container_width=True)
+        st.dataframe(pivot, width="stretch")
 
     elif view_tab == 'Pod Details':
         st.markdown("### Microservice instances")
-        st.dataframe(pods_df, use_container_width=True)
+        st.dataframe(pods_df, width="stretch")
 
     elif view_tab == 'Pods per Node':
         st.markdown("### Pods per node")
