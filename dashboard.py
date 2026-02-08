@@ -297,6 +297,17 @@ def main():
         )
         st.sidebar.write(f"Restart microservices exit code: {rc}")
 
+    if st.sidebar.button("Recreate Cluster"):
+        cmd_str = f"k3d cluster delete {K3D_CLUSTER_NAME}; bash run.sh"
+        rc, out = stream_cmd_ui(
+            ["bash", "-c", cmd_str],
+            cwd=LAB_DIR,
+            placeholder=action_log,
+            title="Recreate Cluster Output",
+        )
+        st.session_state["last_log"] = {"title": "Recreate Cluster Output", "content": out}
+        st.rerun()
+
     st.sidebar.markdown("### Lab bootstrap")
 
     if st.sidebar.button("Run bash run.sh"):
