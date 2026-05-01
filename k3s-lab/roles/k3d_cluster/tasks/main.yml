@@ -19,7 +19,8 @@
       --agents 0 \
       --servers-memory 3g \
       --api-port 6443 \
-      --port 8080:80@loadbalancer
+      --port 8080:80@loadbalancer \
+      --k3s-arg "--tls-san=192.168.122.166@server:*"
   when: k3d_cluster_check.rc != 0
 
 # worker-small: 1 GiB
