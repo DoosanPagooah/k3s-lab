@@ -113,6 +113,24 @@
     mode: "0600"
     remote_src: true
 
+- name: Patch kubeconfig server address to VM IP
+  ansible.builtin.replace:
+    path: /home/ubuntu/.kube/config
+    regexp: 'https://0\.0\.0\.0:6443'
+    replace: 'https://192.168.122.166:6443'
+
+- name: Remove certificate-authority-data from kubeconfig
+  ansible.builtin.replace:
+    path: /home/ubuntu/.kube/config
+    regexp: '^\s+certificate-authority-data:.*\n'
+    replace: ''
+
+- name: Set insecure-skip-tls-verify in kubeconfig
+  ansible.builtin.shell: |
+    KUBECONFIG=/home/ubuntu/.kube/config \
+      kubectl config set-cluster myk3s --insecure-skip-tls-verify=true
+  changed_when: false
+
 - name: Wait for all 5 nodes to appear (using kubectl)
   ansible.builtin.shell: |
     KUBECONFIG=/root/.kube/config kubectl get nodes --no-headers 2>/dev/null | wc -l
