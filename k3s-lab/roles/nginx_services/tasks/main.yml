@@ -1,12 +1,12 @@
-- name: Deploy 20 nginx microservices
+- name: Deploy 5 nginx microservices
   kubernetes.core.k8s:
     state: present
     definition: "{{ lookup('template', 'nginx-deploy.yaml.j2') }}"
-  loop: "{{ range(1, 21) | list }}"
+  loop: "{{ range(1, 6) | list }}"
   loop_control:
     loop_var: index
 
-- name: Wait for 20 nginx pods to be Running
+- name: Wait for 5 nginx pods to be Running
   ansible.builtin.shell: |
     KUBECONFIG=/root/.kube/config \
       kubectl get pods -n default -l svc-id \
@@ -15,7 +15,7 @@
   register: running_pods
   retries: 30
   delay: 10
-  until: (running_pods.stdout | int) >= 20
+  until: (running_pods.stdout | int) >= 5
   changed_when: false
 
 - name: Create ingress to expose nginx microservices on /svc-N
