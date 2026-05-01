@@ -1,17 +1,16 @@
-import itertools
 import subprocess
 import json
+import os
 import time
 import pandas as pd
 import streamlit as st
 import streamlit_shadcn_ui as ui
 
+KUBECONFIG = os.environ.get("KUBECONFIG", "/home/ubuntu/.kube/config")
+SUBPROCESS_ENV = {**os.environ, "KUBECONFIG": KUBECONFIG}
 
 
 def run_cmd(cmd, cwd=None):
-    """
-    Run a shell command and return (stdout, stderr, returncode).
-    """
     try:
         result = subprocess.run(
             cmd,
@@ -19,6 +18,7 @@ def run_cmd(cmd, cwd=None):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             cwd=cwd,
+            env=SUBPROCESS_ENV,
         )
         return result.stdout.strip(), result.stderr.strip(), result.returncode
     except Exception as e:
@@ -27,11 +27,6 @@ def run_cmd(cmd, cwd=None):
 
 
 def stream_cmd_ui(cmd, cwd=None, placeholder=None, title="Action output"):
-    """
-    Run a command and stream its combined stdout+stderr
-    into a Streamlit placeholder as it runs.
-    Returns the exit code.
-    """
     if placeholder is None:
         placeholder = st.empty()
 
@@ -49,12 +44,12 @@ def stream_cmd_ui(cmd, cwd=None, placeholder=None, title="Action output"):
                 stderr=subprocess.STDOUT,
                 text=True,
                 bufsize=1,
+                env=SUBPROCESS_ENV,
             )
 
             for line in process.stdout:
                 line = line.rstrip("\n")
                 lines.append(line)
-                # show last 200 lines to avoid huge blocks
                 log_box.text_area("Log Output", value="\n".join(lines[-200:]), height=300)
 
             process.wait()
@@ -299,6 +294,7 @@ def main():
         st.sidebar.write(f"Restart microservices exit code: {rc}")
 
     if st.sidebar.button("Recreate Cluster"):
+        st.session_state["recreating"] = True
         cmd_str = (
             f"k3d cluster delete {K3D_CLUSTER_NAME} 2>/dev/null || true; "
             "docker rm -f k3d-worker-small-0 k3d-worker-medium-0 k3d-worker-large-0 k3d-worker-xlarge-0 k3d-myk3s-server-0 2>/dev/null || true; "
@@ -311,6 +307,7 @@ def main():
             title="Recreate Cluster Output",
         )
         st.session_state["last_log"] = {"title": "Recreate Cluster Output", "content": out}
+        st.session_state["recreating"] = False
         st.rerun()
 
     st.sidebar.markdown("### Lab bootstrap")
@@ -325,12 +322,16 @@ def main():
         )
         st.sidebar.write(f"run.sh exit code: {rc}")
 
+    if st.session_state.get("recreating"):
+        st.info("Cluster is being recreated, please wait...")
+        return
+
     # Load data
     pods_df = get_pods("default")
     nodes_df, metrics_df = get_node_info()
 
     if pods_df.empty:
-        st.error("No pods found in namespace 'default'. Is the cluster up and nginx services deployed?")
+        st.warning("No pods found in namespace 'default'. Is the cluster up and nginx services deployed?")
         return
 
     # Summary
