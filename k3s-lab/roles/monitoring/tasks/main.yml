@@ -21,7 +21,7 @@
     kind: Pod
     namespace: monitoring
     label_selectors:
-      - app.kubernetes.io/name=kps-kube-prometheus-stack-prometheus
+      - app.kubernetes.io/name=prometheus
   register: prom_pods
   retries: 30
   delay: 10
