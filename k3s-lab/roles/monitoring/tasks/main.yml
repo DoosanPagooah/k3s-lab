@@ -17,12 +17,13 @@
   changed_when: "'deployed' in helm_result.stdout or 'upgraded' in helm_result.stdout or helm_result.rc == 0"
 
 - name: Wait for Prometheus pods
-  kubernetes.core.k8s_info:
-    kind: Pod
-    namespace: monitoring
-    label_selectors:
-      - app.kubernetes.io/name=prometheus
+  ansible.builtin.shell: |
+    KUBECONFIG=/root/.kube/config \
+      kubectl get pods -n monitoring -l app.kubernetes.io/name=prometheus \
+      --no-headers 2>/dev/null | grep -c Running
   register: prom_pods
   retries: 30
   delay: 10
-  until: prom_pods.resources is defined and prom_pods.resources | length > 0
+  until: (prom_pods.stdout | int) > 0
+  changed_when: false
+  failed_when: false
