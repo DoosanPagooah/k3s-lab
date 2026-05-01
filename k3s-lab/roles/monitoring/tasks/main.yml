@@ -25,4 +25,4 @@
   register: prom_pods
   retries: 30
   delay: 10
-  until: prom_pods.resources | length > 0
+  until: prom_pods.resources is defined and prom_pods.resources | length > 0
