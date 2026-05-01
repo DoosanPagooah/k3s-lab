@@ -299,11 +299,10 @@ def main():
         st.sidebar.write(f"Restart microservices exit code: {rc}")
 
     if st.sidebar.button("Recreate Cluster"):
-        # Force cleanup of specific containers that might linger to avoid conflicts
         cmd_str = (
             f"k3d cluster delete {K3D_CLUSTER_NAME} 2>/dev/null || true; "
             "docker rm -f k3d-worker-small-0 k3d-worker-medium-0 k3d-worker-large-0 k3d-worker-xlarge-0 k3d-myk3s-server-0 2>/dev/null || true; "
-            "bash run.sh"
+            "ansible-playbook -i inventory.ini site.yml --start-at-task 'Install k3d if not present'"
         )
         rc, out = stream_cmd_ui(
             ["bash", "-c", cmd_str],
