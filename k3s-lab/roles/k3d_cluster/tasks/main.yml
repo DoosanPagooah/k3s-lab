@@ -128,7 +128,7 @@
 - name: Set insecure-skip-tls-verify in kubeconfig
   ansible.builtin.shell: |
     KUBECONFIG=/home/ubuntu/.kube/config \
-      kubectl config set-cluster myk3s --insecure-skip-tls-verify=true
+      kubectl config set-cluster k3d-myk3s --insecure-skip-tls-verify=true
   changed_when: false
 
 - name: Wait for all 5 nodes to appear (using kubectl)
