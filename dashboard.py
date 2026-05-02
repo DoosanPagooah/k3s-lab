@@ -86,6 +86,41 @@ def is_cluster_running():
     return False
 
 
+def watch_cluster_state(placeholder, title, max_polls=72, interval=5):
+    """Poll nodes, pods and events every interval seconds, streaming into placeholder."""
+    with placeholder.container():
+        st.markdown(f"### {title}")
+        log_box = st.empty()
+        lines = []
+
+        for _ in range(max_polls):
+            nodes_out, _, _ = run_cmd(["kubectl", "get", "nodes", "--no-headers"])
+            pods_out, _, _ = run_cmd([
+                "kubectl", "get", "pods", "-n", "default",
+                "-o", "wide", "--no-headers",
+            ])
+            events_out, _, _ = run_cmd([
+                "kubectl", "get", "events", "-n", "default",
+                "--sort-by=.lastTimestamp", "--no-headers",
+            ])
+
+            ts = time.strftime("%H:%M:%S")
+            lines.append(f"\n[{ts}] --- NODES ---")
+            lines.extend(nodes_out.splitlines() if nodes_out else ["  (none)"])
+            lines.append(f"[{ts}] --- PODS ---")
+            lines.extend(pods_out.splitlines() if pods_out else ["  (none)"])
+            if events_out:
+                lines.append(f"[{ts}] --- RECENT EVENTS ---")
+                lines.extend(events_out.splitlines()[-8:])
+
+            log_box.text_area(
+                "Live cluster state",
+                value="\n".join(lines[-150:]),
+                height=400,
+            )
+            time.sleep(interval)
+
+
 def get_worker_nodes():
     out, _, rc = run_cmd(["k3d", "node", "list", "--no-headers"])
     if rc != 0 or not out:
@@ -336,11 +371,27 @@ def main():
         col1.markdown(f"{status_icon} `{short}`")
         if node["running"]:
             if col2.button("Stop", key=f"stop_{node['name']}", disabled=not cluster_running):
-                run_cmd(["k3d", "node", "stop", node["name"]])
+                stream_cmd_ui(
+                    ["k3d", "node", "stop", node["name"], "--verbose"],
+                    placeholder=action_log,
+                    title=f"Stopping {short}",
+                )
+                watch_cluster_state(
+                    action_log,
+                    f"Cluster state after stopping {short} — watching pod migration",
+                )
                 st.rerun()
         else:
             if col2.button("Start", key=f"start_{node['name']}", disabled=not cluster_running):
-                run_cmd(["k3d", "node", "start", node["name"]])
+                stream_cmd_ui(
+                    ["k3d", "node", "start", node["name"], "--verbose"],
+                    placeholder=action_log,
+                    title=f"Starting {short}",
+                )
+                watch_cluster_state(
+                    action_log,
+                    f"Cluster state after starting {short} — watching pod reinstatement",
+                )
                 st.rerun()
 
     st.sidebar.markdown("### Lab bootstrap")
