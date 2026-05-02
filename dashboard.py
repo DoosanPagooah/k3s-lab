@@ -79,12 +79,27 @@ def is_cluster_running():
     try:
         parts = out.split()
         if len(parts) >= 2:
-            servers = parts[1]
-            running = int(servers.split("/")[0])
+            running = int(parts[1].split("/")[0])
             return running > 0
     except Exception:
         pass
     return False
+
+
+def get_worker_nodes():
+    out, _, rc = run_cmd(["k3d", "node", "list", "--no-headers"])
+    if rc != 0 or not out:
+        return []
+    nodes = []
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        name, role, cluster, status = parts[0], parts[1], parts[2], parts[3]
+        if cluster != K3D_CLUSTER_NAME or role != "agent":
+            continue
+        nodes.append({"name": name, "running": status.lower() == "running"})
+    return nodes
 
 
 def k3d_cluster_start():
@@ -309,6 +324,24 @@ def main():
         st.session_state["last_log"] = {"title": "Recreate Cluster Output", "content": out}
         st.session_state["recreating"] = False
         st.rerun()
+
+    st.sidebar.markdown("### Node control")
+    worker_nodes = get_worker_nodes()
+    if not worker_nodes:
+        st.sidebar.caption("No worker nodes found.")
+    for node in worker_nodes:
+        col1, col2 = st.sidebar.columns([2, 1])
+        short = node["name"].replace("k3d-", "")
+        status_icon = "🟢" if node["running"] else "🔴"
+        col1.markdown(f"{status_icon} `{short}`")
+        if node["running"]:
+            if col2.button("Stop", key=f"stop_{node['name']}"):
+                run_cmd(["k3d", "node", "stop", node["name"]])
+                st.rerun()
+        else:
+            if col2.button("Start", key=f"start_{node['name']}"):
+                run_cmd(["k3d", "node", "start", node["name"]])
+                st.rerun()
 
     st.sidebar.markdown("### Lab bootstrap")
 
