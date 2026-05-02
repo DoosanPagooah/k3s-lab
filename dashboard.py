@@ -283,7 +283,7 @@ def main():
 
     if st.sidebar.button("Start cluster", disabled=cluster_running):
         rc, out = stream_cmd_ui(
-            ["k3d", "cluster", "start", K3D_CLUSTER_NAME],
+            ["k3d", "cluster", "start", K3D_CLUSTER_NAME, "--verbose"],
             placeholder=action_log,
             title="Start cluster output",
         )
@@ -292,7 +292,7 @@ def main():
 
     if st.sidebar.button("Stop cluster", disabled=not cluster_running):
         rc, out = stream_cmd_ui(
-            ["k3d", "cluster", "stop", K3D_CLUSTER_NAME],
+            ["k3d", "cluster", "stop", K3D_CLUSTER_NAME, "--verbose"],
             placeholder=action_log,
             title="Stop cluster output",
         )
