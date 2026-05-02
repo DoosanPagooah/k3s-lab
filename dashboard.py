@@ -335,11 +335,11 @@ def main():
         status_icon = "🟢" if node["running"] else "🔴"
         col1.markdown(f"{status_icon} `{short}`")
         if node["running"]:
-            if col2.button("Stop", key=f"stop_{node['name']}"):
+            if col2.button("Stop", key=f"stop_{node['name']}", disabled=not cluster_running):
                 run_cmd(["k3d", "node", "stop", node["name"]])
                 st.rerun()
         else:
-            if col2.button("Start", key=f"start_{node['name']}"):
+            if col2.button("Start", key=f"start_{node['name']}", disabled=not cluster_running):
                 run_cmd(["k3d", "node", "start", node["name"]])
                 st.rerun()
 
