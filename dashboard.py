@@ -293,10 +293,85 @@ def get_node_info():
 
     return merged, metrics_df
 
+def inject_custom_css():
+    st.markdown(
+        """
+        <style>
+        .block-container {
+            padding-top: 2rem;
+            padding-bottom: 3rem;
+        }
+        [data-testid="stSidebar"] {
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        [data-testid="stSidebar"] h3 {
+            margin-top: 1.4rem;
+            margin-bottom: 0.4rem;
+            font-size: 0.85rem;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            color: #9A9DB0;
+        }
+        .status-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            padding: 0.25rem 0.7rem;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+        .status-pill.running {
+            background: rgba(46, 204, 113, 0.14);
+            color: #4ADE80;
+        }
+        .status-pill.stopped {
+            background: rgba(231, 76, 60, 0.14);
+            color: #F87171;
+        }
+        .node-row {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.3rem 0;
+            font-size: 0.92rem;
+        }
+        .dot {
+            height: 0.55rem;
+            width: 0.55rem;
+            border-radius: 50%;
+            display: inline-block;
+            flex-shrink: 0;
+        }
+        .dot.running { background: #4ADE80; box-shadow: 0 0 6px rgba(74, 222, 128, 0.7); }
+        .dot.stopped { background: #F87171; box-shadow: 0 0 6px rgba(248, 113, 113, 0.5); }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def status_pill(running: bool) -> str:
+    css_class = "running" if running else "stopped"
+    label = "Running" if running else "Stopped"
+    return f'<span class="status-pill {css_class}">● {label}</span>'
+
+
 def main():
-    st.set_page_config(page_title="K3s Microservices Dashboard", layout="wide")
-    st.title("K3s Microservices and Nodes Dashboard")
-    st.caption("Cluster: myk3s (k3d)")
+    st.set_page_config(page_title="K3s Microservices Dashboard", layout="wide", page_icon="🛰️")
+    inject_custom_css()
+
+    cluster_running = is_cluster_running()
+
+    header_col, status_col = st.columns([5, 1])
+    with header_col:
+        st.title("🛰️ K3s Microservices and Nodes Dashboard")
+        st.caption("Cluster: **myk3s** (k3d)")
+    with status_col:
+        st.markdown(
+            f'<div style="text-align:right; padding-top: 1.6rem;">{status_pill(cluster_running)}</div>',
+            unsafe_allow_html=True,
+        )
 
     # shared area in the main page where button actions will print logs
     action_log = st.empty()
@@ -308,15 +383,13 @@ def main():
 
     # sidebar controls
     st.sidebar.header("Controls")
-    st.sidebar.button("Manual Refresh")
+    st.sidebar.button("🔄 Manual Refresh")
     interval = st.sidebar.slider("Auto refresh interval (seconds)", 5, 60, 10)
-    st.sidebar.write("Last refresh:", time.strftime("%H:%M:%S"))
+    st.sidebar.caption(f"Last refresh: {time.strftime('%H:%M:%S')}")
 
     st.sidebar.markdown("### Cluster actions")
 
-    cluster_running = is_cluster_running()
-
-    if st.sidebar.button("Start cluster", disabled=cluster_running):
+    if st.sidebar.button("▶️ Start cluster", disabled=cluster_running):
         rc, out = stream_cmd_ui(
             ["k3d", "cluster", "start", K3D_CLUSTER_NAME, "--verbose"],
             placeholder=action_log,
@@ -325,7 +398,7 @@ def main():
         st.session_state["last_log"] = {"title": "Start cluster output", "content": out}
         st.rerun()
 
-    if st.sidebar.button("Stop cluster", disabled=not cluster_running):
+    if st.sidebar.button("⏹️ Stop cluster", disabled=not cluster_running):
         rc, out = stream_cmd_ui(
             ["k3d", "cluster", "stop", K3D_CLUSTER_NAME, "--verbose"],
             placeholder=action_log,
@@ -334,7 +407,7 @@ def main():
         st.session_state["last_log"] = {"title": "Stop cluster output", "content": out}
         st.rerun()
 
-    if st.sidebar.button("Restart microservices", disabled=not cluster_running):
+    if st.sidebar.button("🔁 Restart microservices", disabled=not cluster_running):
         rc, _ = stream_cmd_ui(
             ["kubectl", "rollout", "restart",
              "deployment", "-n", "default", "-l", "svc-id"],
@@ -343,7 +416,7 @@ def main():
         )
         st.sidebar.write(f"Restart microservices exit code: {rc}")
 
-    if st.sidebar.button("Recreate Cluster"):
+    if st.sidebar.button("♻️ Recreate Cluster"):
         st.session_state["recreating"] = True
         cmd_str = (
             f"k3d cluster delete {K3D_CLUSTER_NAME} 2>/dev/null || true; "
@@ -367,8 +440,12 @@ def main():
     for node in worker_nodes:
         col1, col2 = st.sidebar.columns([2, 1])
         short = node["name"].replace("k3d-", "")
-        status_icon = "🟢" if node["running"] else "🔴"
-        col1.markdown(f"{status_icon} `{short}`")
+        dot_class = "running" if node["running"] else "stopped"
+        col1.markdown(
+            f'<div class="node-row"><span class="dot {dot_class}"></span>'
+            f'<code>{short}</code></div>',
+            unsafe_allow_html=True,
+        )
         if node["running"]:
             if col2.button("Stop", key=f"stop_{node['name']}", disabled=not cluster_running):
                 stream_cmd_ui(
@@ -396,7 +473,7 @@ def main():
 
     st.sidebar.markdown("### Lab bootstrap")
 
-    if st.sidebar.button("Run bash run.sh"):
+    if st.sidebar.button("▶️ Run bash run.sh"):
         st.sidebar.write("Running bash run.sh, this may take a while...")
         rc, _ = stream_cmd_ui(
             ["bash", "run.sh"],
@@ -429,33 +506,34 @@ def main():
 
     st.divider()
     
-    view_tab = ui.tabs(options=['Node Overview', 'Microservices Matrix', 'Pod Details', 'Pods per Node'], default_value='Node Overview', key="main_tabs")
+    view_tab = ui.tabs(options=['🖥️ Node Overview', '🧩 Microservices Matrix', '📦 Pod Details', '📊 Pods per Node'], default_value='🖥️ Node Overview', key="main_tabs")
 
-    if view_tab == 'Node Overview':
-        st.markdown("### Node overview")
-        if not nodes_df.empty:
-            display_df = nodes_df.copy()
-            display_df["mem_capacity_GiB"] = (display_df["mem_capacity_bytes"] / (1024**3)).round(2)
-            if "mem_used_bytes" in display_df.columns:
-                display_df["mem_used_GiB"] = (display_df["mem_used_bytes"] / (1024**3)).round(2)
-            st.dataframe(display_df.set_index("node"), width="stretch")
-        else:
-            st.warning("Could not load node info. Check kubectl access.")
+    with st.container(border=True):
+        if view_tab == '🖥️ Node Overview':
+            st.markdown("#### Node overview")
+            if not nodes_df.empty:
+                display_df = nodes_df.copy()
+                display_df["mem_capacity_GiB"] = (display_df["mem_capacity_bytes"] / (1024**3)).round(2)
+                if "mem_used_bytes" in display_df.columns:
+                    display_df["mem_used_GiB"] = (display_df["mem_used_bytes"] / (1024**3)).round(2)
+                st.dataframe(display_df.set_index("node"), width="stretch")
+            else:
+                st.warning("Could not load node info. Check kubectl access.")
 
-    elif view_tab == 'Microservices Matrix':
-        st.markdown("### Microservices by node")
-        ms_node_df = pods_df.groupby(["node", "microservice"]).size().reset_index(name="pods")
-        pivot = ms_node_df.pivot(index="node", columns="microservice", values="pods").fillna(0).astype(int)
-        st.dataframe(pivot, width="stretch")
+        elif view_tab == '🧩 Microservices Matrix':
+            st.markdown("#### Microservices by node")
+            ms_node_df = pods_df.groupby(["node", "microservice"]).size().reset_index(name="pods")
+            pivot = ms_node_df.pivot(index="node", columns="microservice", values="pods").fillna(0).astype(int)
+            st.dataframe(pivot, width="stretch")
 
-    elif view_tab == 'Pod Details':
-        st.markdown("### Microservice instances")
-        st.dataframe(pods_df, width="stretch")
+        elif view_tab == '📦 Pod Details':
+            st.markdown("#### Microservice instances")
+            st.dataframe(pods_df, width="stretch")
 
-    elif view_tab == 'Pods per Node':
-        st.markdown("### Pods per node")
-        pods_per_node = pods_df.groupby("node").size().reset_index(name="pod_count")
-        st.bar_chart(data=pods_per_node, x="node", y="pod_count")
+        elif view_tab == '📊 Pods per Node':
+            st.markdown("#### Pods per node")
+            pods_per_node = pods_df.groupby("node").size().reset_index(name="pod_count")
+            st.bar_chart(data=pods_per_node, x="node", y="pod_count")
 
     st.sidebar.info("Tip: run `streamlit run dashboard.py` and open the URL from your host browser.")
 
