@@ -121,6 +121,91 @@ def watch_cluster_state(placeholder, title, max_polls=72, interval=5):
             time.sleep(interval)
 
 
+def _node_is_running(node_name):
+    """Returns True/False for node_name's current running state per `k3d
+    node list`, or None if it can't be determined (command failed / node
+    not found)."""
+    out, _, rc = run_cmd(["k3d", "node", "list", "--no-headers"])
+    if rc != 0 or not out:
+        return None
+    for line in out.splitlines():
+        parts = line.split()
+        if len(parts) >= 4 and parts[0] == node_name:
+            return parts[3].lower() == "running"
+    return None
+
+
+def _wait_for_node_state(node_name, expect_running, max_wait=60, interval=5):
+    """Polls k3d for node_name's running state until it matches
+    expect_running or max_wait seconds elapse. Returns True if converged."""
+    elapsed = 0
+    while elapsed < max_wait:
+        if _node_is_running(node_name) is expect_running:
+            return True
+        time.sleep(interval)
+        elapsed += interval
+    return False
+
+
+def _do_node_action(node_name, short, verb, action_log):
+    """Runs `k3d node stop/start` and verifies the node actually converges
+    to the expected state, retrying once if it doesn't.
+
+    k3d's own exit code is NOT a reliable success signal here: it can
+    return 0 even when the node doesn't reach the expected Ready/NotReady
+    state for several minutes, or at all within a reasonable window --
+    confirmed via `kubectl get events` showing a NodeReady -> NodeNotReady
+    flip immediately after a "successful" start, and via repeated manual
+    testing showing wildly inconsistent convergence times (as fast as 8s,
+    as slow as a full flap-then-settle cycle, and at least one case of no
+    convergence at all within 6 minutes on the first attempt). This is
+    infrastructure-level non-determinism (Docker/k3d/kubelet), not
+    something fixable in this script -- see chapter6_testing.md for the
+    full investigation. This function makes the dashboard honest about
+    that instead of silently claiming success once k3d's command returns,
+    and gives convergence a second chance via one retry, since a retry
+    empirically succeeds often enough to be worth it.
+    """
+    expect_running = verb == "start"
+    past_tense = "started" if verb == "start" else "stopped"
+
+    rc, out = stream_cmd_ui(
+        ["k3d", "node", verb, node_name, "--verbose"],
+        placeholder=action_log,
+        title=f"{verb.capitalize()}ing {short}",
+    )
+    if rc != 0:
+        st.session_state["last_log"] = {
+            "title": f"{verb.capitalize()}ing {short} FAILED (exit {rc})",
+            "content": out,
+        }
+        return
+
+    converged = _wait_for_node_state(node_name, expect_running, max_wait=60, interval=5)
+    if not converged:
+        rc2, out2 = stream_cmd_ui(
+            ["k3d", "node", verb, node_name, "--verbose"],
+            placeholder=action_log,
+            title=f"Retrying {verb} for {short} (did not converge within 60s)",
+        )
+        out = out + "\n\n--- RETRY (first attempt did not converge) ---\n" + out2
+        if rc2 == 0:
+            converged = _wait_for_node_state(node_name, expect_running, max_wait=60, interval=5)
+
+    if converged:
+        st.session_state["pending_node_watch"] = {"short": short, "action": past_tense}
+    else:
+        st.session_state["last_log"] = {
+            "title": (
+                f"{short}: k3d reported success but the node did not converge to "
+                f"'{past_tense}' even after a retry -- this points at something "
+                f"below this dashboard (check `docker logs k3d-{node_name}`, "
+                f"`docker ps -a`, and host resource pressure)"
+            ),
+            "content": out,
+        }
+
+
 def get_worker_nodes():
     out, _, rc = run_cmd(["k3d", "node", "list", "--no-headers"])
     if rc != 0 or not out:
@@ -381,6 +466,28 @@ def main():
             st.markdown(f"### {st.session_state['last_log']['title']}")
             st.text_area("Log Output", value=st.session_state['last_log']['content'], height=300)
 
+    pending_watch = st.session_state.get("pending_node_watch")
+    if pending_watch:
+        st.info(
+            f"Node **{pending_watch['short']}** was {pending_watch['action']}. "
+            "The sidebar status above already reflects this. Pods may still be "
+            "rescheduling in the background — watch live below if you want to confirm, "
+            "or just carry on; this is informational only."
+        )
+        watch_col1, watch_col2 = st.columns([1, 4])
+        if watch_col1.button("👁 Watch cluster settle", key="watch_cluster_settle"):
+            watch_cluster_state(
+                action_log,
+                f"Cluster state after {pending_watch['action']} {pending_watch['short']} — watching pod migration",
+                max_polls=24,
+                interval=5,
+            )
+            del st.session_state["pending_node_watch"]
+            st.rerun()
+        if watch_col2.button("Dismiss", key="dismiss_node_watch"):
+            del st.session_state["pending_node_watch"]
+            st.rerun()
+
     # sidebar controls
     st.sidebar.header("Controls")
     st.sidebar.button("🔄 Manual Refresh")
@@ -448,27 +555,11 @@ def main():
         )
         if node["running"]:
             if col2.button("Stop", key=f"stop_{node['name']}", disabled=not cluster_running):
-                stream_cmd_ui(
-                    ["k3d", "node", "stop", node["name"], "--verbose"],
-                    placeholder=action_log,
-                    title=f"Stopping {short}",
-                )
-                watch_cluster_state(
-                    action_log,
-                    f"Cluster state after stopping {short} — watching pod migration",
-                )
+                _do_node_action(node["name"], short, "stop", action_log)
                 st.rerun()
         else:
             if col2.button("Start", key=f"start_{node['name']}", disabled=not cluster_running):
-                stream_cmd_ui(
-                    ["k3d", "node", "start", node["name"], "--verbose"],
-                    placeholder=action_log,
-                    title=f"Starting {short}",
-                )
-                watch_cluster_state(
-                    action_log,
-                    f"Cluster state after starting {short} — watching pod reinstatement",
-                )
+                _do_node_action(node["name"], short, "start", action_log)
                 st.rerun()
 
     st.sidebar.markdown("### Lab bootstrap")
